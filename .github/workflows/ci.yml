@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: knowledgeos
+          POSTGRES_PASSWORD: knowledgeos
+          POSTGRES_DB: knowledgeos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U knowledgeos"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: knowledgeos
+          MINIO_ROOT_PASSWORD: knowledgeos-dev-secret
+        ports: ["9000:9000"]
+
+    env:
+      DATABASE_URL: postgresql+psycopg://knowledgeos:knowledgeos@localhost:5432/knowledgeos
+      REDIS_URL: redis://localhost:6379/0
+      S3_ENDPOINT_URL: http://localhost:9000
+      S3_ACCESS_KEY: knowledgeos
+      S3_SECRET_KEY: knowledgeos-dev-secret
+      S3_BUCKET: documents
+      CLERK_ISSUER: https://example.clerk.accounts.dev
+      ANTHROPIC_API_KEY: test
+      OPENAI_API_KEY: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        working-directory: backend
+        run: ruff check .
+
+      - name: Formatting
+        working-directory: backend
+        run: ruff format --check .
+
+      - name: Type check
+        working-directory: backend
+        run: mypy app
+
+      - name: Run database migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest -v
+
+      - name: Smoke test — boot the app and hit /health/ready
+        working-directory: backend
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          SERVER_PID=$!
+          for i in $(seq 1 20); do
+            curl -fsS http://localhost:8000/health/ready && break
+            sleep 1
+          done
+          curl -fsS http://localhost:8000/health/ready
+          kill $SERVER_PID
+
+  frontend:
+    runs-on: ubuntu-latest
+    env:
+      # Clerk validates the publishable key's format (not just presence) even during
+      # a build with no real auth traffic — this is base64("example.clerk.accounts.dev$")
+      # with a pk_test_ prefix, structurally valid but not a real/usable key.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api
+      NEXT_PUBLIC_BASE_URL: http://localhost:3015
+      CLERK_SECRET_KEY: sk_test_placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Formatting
+        working-directory: frontend
+        run: npm run format:check
+
+      - name: Type check
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build

@@ -1,0 +1,164 @@
+# Production stack: built images (no bind mounts), restart policies, healthchecks,
+# and Caddy as the only public ingress (automatic HTTPS via Let's Encrypt once
+# DOMAIN points at this host).
+#
+# Set GHCR_IMAGE_PREFIX in .env to ghcr.io/<github-owner>/<repo> — must match the
+# repository this CD workflow pushes to, so `docker compose pull` finds them.
+#
+# First deploy / manual rebuild (builds locally instead of pulling):
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Normal deploy after CI/CD has pushed new images (what cd.yml runs over SSH):
+#   docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: knowledgeos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real password in .env}
+      POSTGRES_DB: knowledgeos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledgeos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set in .env}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set in .env}
+    volumes:
+      - minio_data:/data
+    # No reliable curl/wget in this image for a CMD healthcheck — depends_on below
+    # just waits for the container to start, not for the API to be ready. Swap for
+    # real AWS S3 (just change S3_ENDPOINT_URL) if you'd rather not run this at all.
+
+  backend:
+    image: ${GHCR_IMAGE_PREFIX:?set in .env, e.g. ghcr.io/you/knowledgeos}/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://knowledgeos:${POSTGRES_PASSWORD}@postgres:5432/knowledgeos
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  celery-worker:
+    image: ${GHCR_IMAGE_PREFIX:?set in .env, e.g. ghcr.io/you/knowledgeos}/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://knowledgeos:${POSTGRES_PASSWORD}@postgres:5432/knowledgeos
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "-Q", "ingestion", "--loglevel=info"]
+
+  celery-worker-embedding:
+    image: ${GHCR_IMAGE_PREFIX:?set in .env, e.g. ghcr.io/you/knowledgeos}/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://knowledgeos:${POSTGRES_PASSWORD}@postgres:5432/knowledgeos
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "-Q", "embedding", "--concurrency=8", "--loglevel=info"]
+
+  frontend:
+    image: ${GHCR_IMAGE_PREFIX:?set in .env, e.g. ghcr.io/you/knowledgeos}/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL}
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - backend
+
+  # Celery queue monitoring — intentionally not routed through Caddy. Reach it via
+  # `ssh -L 5555:localhost:5555 your-vps` and open http://localhost:5555, rather
+  # than exposing a dashboard with only basic auth to the public internet.
+  flower:
+    image: mher/flower:2.0
+    restart: unless-stopped
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:?set user:password in .env}
+    ports:
+      - "127.0.0.1:5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  caddy_data:
+  caddy_config:

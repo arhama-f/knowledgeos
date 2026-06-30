@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.env
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Vercel
+frontend/.vercel/
+
+# macOS
+.DS_Store
+*.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+nohup.out
+
+# Editor
+.vscode/
+.idea/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+coverage/
+
+# Conda env
+backend/.venv/

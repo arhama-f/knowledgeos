@@ -1,0 +1,105 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Wait for CI to pass on this commit before deploying anything.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---- Frontend → Vercel ------------------------------------------------
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Deploy to Vercel
+        # Requires three repo secrets / variables:
+        #   VERCEL_TOKEN   — secret  — from vercel.com/account/tokens
+        #   VERCEL_ORG_ID  — variable — from .vercel/project.json after `vercel link`
+        #   VERCEL_PROJECT_ID — variable — same file
+        # NEXT_PUBLIC_* vars are set inside the Vercel project dashboard (Settings → Environment Variables)
+        # so they don't need to be passed here.
+        run: |
+          npm install --global vercel@latest
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+
+  # ---- Backend → GHCR (then Railway / VPS pulls it) ----------------------
+  build-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/${REPO_LOWER}/backend:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "repo-lower=${REPO_LOWER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile.prod
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}
+            ghcr.io/${{ steps.meta.outputs.repo-lower }}/backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---- Backend deploy → VPS (optional, skip if using Railway) ------------
+  deploy-backend:
+    runs-on: ubuntu-latest
+    needs: build-backend
+    # Only runs when DEPLOY_HOST is configured. Leave it unset if using Railway
+    # (Railway auto-deploys from the GHCR image on its own schedule).
+    if: ${{ vars.DEPLOY_HOST != '' }}
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ vars.DEPLOY_HOST }}
+          username: ${{ vars.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH || '/opt/knowledgeos' }}
+            git pull --ff-only
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose -f docker-compose.prod.yml pull backend celery-worker celery-worker-embedding
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml exec -T backend alembic upgrade head
+            docker image prune -f
