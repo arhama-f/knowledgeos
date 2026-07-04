@@ -15,8 +15,6 @@ router = APIRouter(prefix="/members", tags=["members"])
 def list_members(
     auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)
 ) -> list[MemberOut]:
-    """Read-only — org-level role changes happen via Clerk (Team page) and sync
-    down into organization_members on each authenticated request."""
     stmt = (
         select(OrganizationMember, User)
         .join(User, User.id == OrganizationMember.user_id)
@@ -27,7 +25,6 @@ def list_members(
     return [
         MemberOut(
             user_id=user.id,
-            clerk_user_id=user.clerk_user_id,
             email=user.email,
             name=user.name,
             avatar_url=user.avatar_url,

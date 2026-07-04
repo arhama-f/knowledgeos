@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageSquare, Plus, Send } from "lucide-react";
 
@@ -29,7 +28,6 @@ export default function AskPage() {
 }
 
 function AskPageInner() {
-  const { getToken } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -74,7 +72,7 @@ function AskPageInner() {
     ]);
     setIsStreaming(true);
 
-    await streamAsk(question, sessionId, getToken, {
+    await streamAsk(question, sessionId, {
       onMeta: (data) => {
         if (!sessionId) {
           setSessionId(data.session_id);

@@ -95,13 +95,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     env:
-      # Clerk validates the publishable key's format (not just presence) even during
-      # a build with no real auth traffic — this is base64("example.clerk.accounts.dev$")
-      # with a pk_test_ prefix, structurally valid but not a real/usable key.
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000/api
       NEXT_PUBLIC_BASE_URL: http://localhost:3015
-      CLERK_SECRET_KEY: sk_test_placeholder
 
     steps:
       - uses: actions/checkout@v4

@@ -11,14 +11,13 @@ export interface StreamAskCallbacks {
 export async function streamAsk(
   question: string,
   sessionId: string | null,
-  getToken: () => Promise<string | null>,
   callbacks: StreamAskCallbacks
 ): Promise<void> {
   try {
-    const token = await getToken();
     const response = await fetch(`${API_BASE}/ask`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ question, session_id: sessionId }),
     });
 

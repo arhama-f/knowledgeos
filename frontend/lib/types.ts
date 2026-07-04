@@ -151,7 +151,6 @@ export interface PermissionOut {
 
 export interface MemberOut {
   user_id: string;
-  clerk_user_id: string;
   email: string | null;
   name: string | null;
   avatar_url: string | null;

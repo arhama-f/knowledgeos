@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import AuthContext, require_clerk_admin
+from app.api.deps import AuthContext, require_session_admin
 from app.core.api_keys import generate_api_key
 from app.core.audit import record_audit
 from app.db.session import get_db
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 @router.get("", response_model=list[ApiKeyOut])
 def list_api_keys(
-    auth: AuthContext = Depends(require_clerk_admin), db: Session = Depends(get_db)
+    auth: AuthContext = Depends(require_session_admin), db: Session = Depends(get_db)
 ) -> list[ApiKey]:
     stmt = (
         select(ApiKey)
@@ -31,7 +31,7 @@ def list_api_keys(
 def create_api_key(
     body: ApiKeyCreateRequest,
     request: Request,
-    auth: AuthContext = Depends(require_clerk_admin),
+    auth: AuthContext = Depends(require_session_admin),
     db: Session = Depends(get_db),
 ) -> ApiKeyCreateResponse:
     full_key, prefix, key_hash = generate_api_key()
@@ -62,7 +62,7 @@ def create_api_key(
 def revoke_api_key(
     api_key_id: uuid.UUID,
     request: Request,
-    auth: AuthContext = Depends(require_clerk_admin),
+    auth: AuthContext = Depends(require_session_admin),
     db: Session = Depends(get_db),
 ) -> None:
     api_key = db.get(ApiKey, api_key_id)

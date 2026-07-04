@@ -1,9 +1,13 @@
+"use client";
+
 import Link from "next/link";
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/lib/hooks/use-auth";
 
 export function MarketingNav() {
+  const { data: user, isLoading } = useCurrentUser();
+
   return (
     <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -25,20 +29,21 @@ export function MarketingNav() {
           </Link>
         </nav>
         <div className="flex items-center gap-3">
-          <SignedOut>
-            <Button variant="ghost" asChild>
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/sign-up">Get started</Link>
-            </Button>
-          </SignedOut>
-          <SignedIn>
+          {!isLoading && !user && (
+            <>
+              <Button variant="ghost" asChild>
+                <Link href="/sign-in">Sign in</Link>
+              </Button>
+              <Button asChild>
+                <Link href="/sign-up">Get started</Link>
+              </Button>
+            </>
+          )}
+          {!isLoading && user && (
             <Button variant="ghost" asChild>
               <Link href="/dashboard">Dashboard</Link>
             </Button>
-            <UserButton afterSignOutUrl="/" />
-          </SignedIn>
+          )}
         </div>
       </div>
     </header>

@@ -1,23 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePathname } from "next/navigation";
-import {
-  OrganizationSwitcher,
-  UserButton,
-  useOrganization as useClerkOrganization,
-} from "@clerk/nextjs";
 import {
   FileText,
   KeyRound,
   LayoutDashboard,
+  LogOut,
   MessageSquare,
   Settings,
   ShieldCheck,
   Users,
 } from "lucide-react";
 
-import { useOrganization as useAppOrganization } from "@/lib/hooks/use-organization";
+import { Button } from "@/components/ui/button";
+import { signOut } from "@/lib/auth-client";
+import { useCurrentUser, useInvalidateAuth } from "@/lib/hooks/use-auth";
+import { useOrganization } from "@/lib/hooks/use-organization";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -31,16 +31,22 @@ const NAV_ITEMS = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { membership } = useClerkOrganization();
-  const { data: org } = useAppOrganization();
-  const isAdmin = membership?.role?.split(":").pop() === "admin";
+  const router = useRouter();
+  const { data: authUser } = useCurrentUser();
+  const { data: org } = useOrganization();
+  const invalidate = useInvalidateAuth();
+  const isAdmin = authUser?.role === "admin";
+
+  async function handleSignOut() {
+    await signOut();
+    await invalidate();
+    router.push("/");
+  }
 
   return (
     <aside className="bg-card flex h-full w-64 shrink-0 flex-col border-r">
       <div className="flex items-center gap-2 border-b px-5 py-4">
         {org?.logo_url ? (
-          // Logos are arbitrary customer-hosted URLs — plain <img>, not next/image,
-          // since allow-listing every possible customer domain isn't practical.
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={org.logo_url}
@@ -61,19 +67,6 @@ export function Sidebar() {
           </div>
         )}
         <span className="font-semibold tracking-tight">{org?.name || "KnowledgeOS"}</span>
-      </div>
-
-      <div className="border-b px-3 py-3">
-        <OrganizationSwitcher
-          hidePersonal
-          afterSelectOrganizationUrl="/dashboard"
-          appearance={{
-            elements: {
-              rootBox: "w-full",
-              organizationSwitcherTrigger: "w-full justify-between px-2 py-1.5",
-            },
-          }}
-        />
       </div>
 
       <nav className="flex-1 space-y-0.5 px-3 py-3">
@@ -112,9 +105,19 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="flex items-center gap-2 border-t px-4 py-3">
-        <UserButton afterSignOutUrl="/" />
-        <span className="text-muted-foreground text-sm">Account</span>
+      <div className="border-t px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+            {(authUser?.name ?? authUser?.email ?? "?")[0].toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{authUser?.name ?? authUser?.email}</p>
+            <p className="text-muted-foreground truncate text-xs capitalize">{authUser?.role}</p>
+          </div>
+          <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={handleSignOut} title="Sign out">
+            <LogOut className="size-4" />
+          </Button>
+        </div>
       </div>
     </aside>
   );

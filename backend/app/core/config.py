@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
     s3_use_ssl: bool = False
 
-    # Clerk
-    clerk_issuer: str = ""  # e.g. https://your-app.clerk.accounts.dev
-    clerk_audience: str | None = None
-    clerk_secret_key: str = ""  # used to fetch org details when auto-provisioning
+    # JWT auth
+    secret_key: str = "dev-secret-change-in-production"
+    access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 30
 
     # AI — provider/model selection is config-driven, never hardcoded in business logic
     default_llm_provider: str = "anthropic"

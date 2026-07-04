@@ -6,6 +6,7 @@ from app.api.routes import (
     api_keys,
     ask,
     audit_logs,
+    auth,
     billing,
     departments,
     documents,
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(documents.router, prefix="/api")
 app.include_router(ask.router, prefix="/api")
 app.include_router(organizations.router, prefix="/api")

@@ -1,6 +1,5 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
 import { useCallback } from "react";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api";
@@ -16,24 +15,24 @@ async function readErrorMessage(response: Response): Promise<string> {
 }
 
 export function useApi() {
-  const { getToken } = useAuth();
-
-  const request = useCallback(
-    async (path: string, init: RequestInit = {}): Promise<Response> => {
-      const token = await getToken();
-      const headers = new Headers(init.headers);
-      headers.set("Authorization", `Bearer ${token}`);
-      if (init.body && !(init.body instanceof FormData)) {
-        headers.set("Content-Type", "application/json");
+  const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
+    const headers = new Headers(init.headers);
+    if (init.body && !(init.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers,
+      credentials: "include",
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        window.location.href = "/sign-in";
       }
-      const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response));
-      }
-      return response;
-    },
-    [getToken]
-  );
+      throw new Error(await readErrorMessage(response));
+    }
+    return response;
+  }, []);
 
   const get = useCallback(
     async <T>(path: string): Promise<T> => (await request(path)).json(),
@@ -70,5 +69,5 @@ export function useApi() {
     [request]
   );
 
-  return { request, get, post, patch, delete: del, getToken };
+  return { request, get, post, patch, delete: del };
 }
