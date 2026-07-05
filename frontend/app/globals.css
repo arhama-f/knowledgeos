@@ -74,6 +74,12 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
   * {
     border-color: var(--border);
   }
@@ -83,5 +89,8 @@
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
+  }
+  ::selection {
+    background: oklch(0.51 0.24 276 / 0.18);
   }
 }

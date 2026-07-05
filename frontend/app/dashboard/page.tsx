@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, MessageSquare, Plus } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { FileText, MessageSquare, Plus, UploadCloud } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,35 +29,49 @@ export default function DashboardOverviewPage() {
         action={
           <Button asChild>
             <Link href="/dashboard/ask">
-              <MessageSquare /> Ask a question
+              <MessageSquare className="size-4" /> Ask a question
             </Link>
           </Button>
         }
       />
 
+      {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Documents ready" value={ready} loading={documentsLoading} />
-        <StatCard label="Processing" value={processing} loading={documentsLoading} />
+        <StatCard
+          label="Documents ready"
+          value={ready}
+          loading={documentsLoading}
+          icon={FileText}
+        />
+        <StatCard
+          label="Processing"
+          value={processing}
+          loading={documentsLoading}
+          icon={UploadCloud}
+        />
         <StatCard
           label="Failed"
           value={failed}
           loading={documentsLoading}
           tone={failed > 0 ? "destructive" : undefined}
+          icon={FileText}
         />
       </div>
 
+      {/* Recent conversations */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Recent conversations</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base font-semibold">Recent conversations</CardTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/ask">View all</Link>
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {sessionsLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-3/4" />
             </div>
           ) : sessions && sessions.length > 0 ? (
             <ul className="divide-y">
@@ -64,10 +79,12 @@ export default function DashboardOverviewPage() {
                 <li key={session.id}>
                   <Link
                     href={`/dashboard/ask?session=${session.id}`}
-                    className="hover:text-primary flex items-center gap-3 py-3 text-sm"
+                    className="hover:text-primary flex items-center gap-3 py-3 text-sm transition-colors"
                   >
-                    <MessageSquare className="text-muted-foreground size-4" />
-                    {session.title || "Untitled conversation"}
+                    <MessageSquare className="text-muted-foreground size-4 shrink-0" />
+                    <span className="truncate">
+                      {session.title || "Untitled conversation"}
+                    </span>
                   </Link>
                 </li>
               ))}
@@ -82,28 +99,40 @@ export default function DashboardOverviewPage() {
         </CardContent>
       </Card>
 
+      {/* Recent documents */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Documents</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="text-base font-semibold">Documents</CardTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/documents">
-              <Plus /> Upload
+              <Plus className="size-4" /> Upload
             </Link>
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {documentsLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-10 w-full" />
               <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-3/4" />
             </div>
           ) : documents && documents.length > 0 ? (
             <ul className="divide-y">
               {documents.slice(0, 5).map((doc) => (
                 <li key={doc.id} className="flex items-center gap-3 py-3 text-sm">
-                  <FileText className="text-muted-foreground size-4" />
-                  <span className="flex-1 truncate">{doc.name}</span>
-                  <span className="text-muted-foreground text-xs capitalize">{doc.status}</span>
+                  <FileText className="text-muted-foreground size-4 shrink-0" />
+                  <span className="flex-1 truncate font-medium">{doc.name}</span>
+                  <span
+                    className={`text-xs capitalize ${
+                      doc.status === "ready"
+                        ? "text-emerald-600"
+                        : doc.status === "failed"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                    }`}
+                  >
+                    {doc.status}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -125,21 +154,30 @@ function StatCard({
   value,
   loading,
   tone,
+  icon: Icon,
 }: {
   label: string;
   value: number;
   loading: boolean;
   tone?: "destructive";
+  icon: LucideIcon;
 }) {
   return (
     <Card>
       <CardContent className="p-5">
-        <p className="text-muted-foreground text-sm">{label}</p>
+        <div className="flex items-start justify-between">
+          <p className="text-muted-foreground text-sm">{label}</p>
+          <div className="bg-primary/10 flex size-8 items-center justify-center rounded-lg">
+            <Icon className="text-primary size-4" />
+          </div>
+        </div>
         {loading ? (
-          <Skeleton className="mt-2 h-8 w-12" />
+          <Skeleton className="mt-3 h-8 w-12" />
         ) : (
           <p
-            className={`mt-1 text-3xl font-semibold ${tone === "destructive" ? "text-destructive" : ""}`}
+            className={`mt-2 text-3xl font-semibold ${
+              tone === "destructive" ? "text-destructive" : ""
+            }`}
           >
             {value}
           </p>
