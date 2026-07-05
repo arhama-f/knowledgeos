@@ -73,6 +73,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@keyframes orb-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(-30px, 25px) scale(1.06); }
+  66%       { transform: translate(25px, -15px) scale(0.94); }
+}
+@keyframes orb-drift-reverse {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(20px, -30px) scale(0.96); }
+  66%       { transform: translate(-20px, 15px) scale(1.04); }
+}
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.orb-1 { animation: orb-drift 10s ease-in-out infinite; }
+.orb-2 { animation: orb-drift-reverse 14s ease-in-out infinite; }
+.orb-3 { animation: orb-drift 18s ease-in-out infinite 3s; }
+.badge-dot { animation: badge-pulse 2s ease-in-out infinite; }
+
 @layer base {
   html {
     scroll-behavior: smooth;
