@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Plus, Send } from "lucide-react";
+import { FileText, MessageSquare, Plus, Send, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,12 @@ interface DisplayMessage {
   content: string;
   sources?: SourceOut[] | null;
 }
+
+const SUGGESTED_QUESTIONS = [
+  "What is our vacation policy for remote employees?",
+  "Summarise the onboarding process for new hires",
+  "What are our data retention requirements?",
+];
 
 export default function AskPage() {
   return (
@@ -58,9 +64,8 @@ function AskPageInner() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-    const question = input.trim();
-    if (!question || isStreaming) return;
+  const send = async (question: string) => {
+    if (!question.trim() || isStreaming) return;
     setInput("");
 
     const userMsgId = `local-${Date.now()}-user`;
@@ -102,6 +107,8 @@ function AskPageInner() {
     });
   };
 
+  const handleSend = () => send(input.trim());
+
   const startNewChat = () => {
     setSessionId(null);
     setMessages([]);
@@ -110,68 +117,93 @@ function AskPageInner() {
 
   return (
     <div className="flex h-full">
-      <div className="bg-card hidden w-64 shrink-0 flex-col border-r md:flex">
+      {/* Conversation history sidebar */}
+      <div className="bg-secondary/40 hidden w-60 shrink-0 flex-col border-r md:flex">
         <div className="border-b p-3">
-          <Button variant="outline" className="w-full justify-start" onClick={startNewChat}>
-            <Plus className="size-4" /> New conversation
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 bg-background text-sm"
+            onClick={startNewChat}
+          >
+            <Plus className="size-3.5" />
+            New conversation
           </Button>
         </div>
+
         <div className="flex-1 overflow-y-auto p-2">
-          {sessions?.map((session) => (
-            <button
-              key={session.id}
-              onClick={() => {
-                setSessionId(session.id);
-                router.replace(`/dashboard/ask?session=${session.id}`);
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 truncate rounded-md px-3 py-2 text-left text-sm",
-                sessionId === session.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-              )}
-            >
-              <MessageSquare className="text-muted-foreground size-4 shrink-0" />
-              <span className="truncate">{session.title || "Untitled conversation"}</span>
-            </button>
-          ))}
+          {sessions && sessions.length > 0 ? (
+            <div className="space-y-0.5">
+              {sessions.map((session) => (
+                <button
+                  key={session.id}
+                  onClick={() => {
+                    setSessionId(session.id);
+                    router.replace(`/dashboard/ask?session=${session.id}`);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-2 truncate rounded-md px-3 py-2 text-left text-sm transition-colors",
+                    sessionId === session.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  )}
+                >
+                  <MessageSquare className="size-3.5 shrink-0" />
+                  <span className="truncate">{session.title || "Untitled conversation"}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground px-3 py-4 text-xs">
+              Your conversations will appear here.
+            </p>
+          )}
         </div>
       </div>
 
+      {/* Chat area */}
       <div className="flex flex-1 flex-col">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-8">
-          <div className="mx-auto max-w-2xl space-y-6">
-            {messages.length === 0 && (
-              <div className="py-16 text-center">
-                <MessageSquare className="text-muted-foreground/40 mx-auto size-8" />
-                <p className="mt-3 text-lg font-medium">Ask anything about your company</p>
-                <p className="text-muted-foreground text-sm">
-                  Answers are grounded in your uploaded documents, with citations.
-                </p>
-              </div>
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-2xl space-y-6 px-6 py-8">
+            {messages.length === 0 ? (
+              <EmptyChat onSuggestion={send} />
+            ) : (
+              messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))
             )}
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
           </div>
         </div>
 
-        <div className="bg-card border-t p-4">
-          <div className="mx-auto flex max-w-2xl items-end gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask a question about your company's documents…"
-              className="min-h-11 resize-none"
-              rows={1}
-            />
-            <Button onClick={handleSend} disabled={isStreaming || !input.trim()}>
-              <Send className="size-4" />
-            </Button>
+        {/* Input bar */}
+        <div className="border-t bg-background p-4">
+          <div className="mx-auto max-w-2xl">
+            <div className="flex items-end gap-2 rounded-xl border bg-card shadow-sm focus-within:ring-2 focus-within:ring-ring px-4 py-3">
+              <Textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ask a question about your company's documents…"
+                className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm"
+                rows={1}
+              />
+              <Button
+                size="icon"
+                className="size-8 shrink-0 rounded-lg"
+                onClick={handleSend}
+                disabled={isStreaming || !input.trim()}
+              >
+                <Send className="size-3.5" />
+              </Button>
+            </div>
+            <p className="text-muted-foreground mt-1.5 text-center text-[11px]">
+              Enter to send · Shift+Enter for new line
+            </p>
           </div>
         </div>
       </div>
@@ -179,25 +211,74 @@ function AskPageInner() {
   );
 }
 
+function EmptyChat({ onSuggestion }: { onSuggestion: (q: string) => void }) {
+  return (
+    <div className="flex flex-col items-center py-20 text-center">
+      <div className="bg-primary/10 mb-4 flex size-12 items-center justify-center rounded-full">
+        <Sparkles className="text-primary size-5" />
+      </div>
+      <h3 className="text-lg font-semibold">Ask anything about your company</h3>
+      <p className="text-muted-foreground mt-1 max-w-sm text-sm">
+        Answers are grounded in your uploaded documents with clickable source citations.
+      </p>
+      <div className="mt-6 flex flex-col gap-2 w-full max-w-md">
+        {SUGGESTED_QUESTIONS.map((q) => (
+          <button
+            key={q}
+            onClick={() => onSuggestion(q)}
+            className="hover:border-primary/50 hover:bg-accent rounded-xl border bg-card px-4 py-3 text-sm text-left transition-colors"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MessageBubble({ message }: { message: DisplayMessage }) {
   const isUser = message.role === "user";
-  return (
-    <div className={cn("flex flex-col gap-2", isUser ? "items-end" : "items-start")}>
-      <div
-        className={cn(
-          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-        )}
-      >
-        {message.content || (!isUser && <span className="text-muted-foreground">Thinking…</span>)}
-      </div>
-      {!isUser && message.sources && message.sources.length > 0 && (
-        <div className="flex w-full max-w-[85%] flex-wrap gap-1.5">
-          {message.sources.map((source, i) => (
-            <SourceChip key={`${source.doc_id}-${i}`} index={i + 1} source={source} />
-          ))}
+
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="bg-primary text-primary-foreground max-w-[80%] rounded-2xl rounded-tr-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+          {message.content}
         </div>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <div className="bg-primary/10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full">
+        <Sparkles className="text-primary size-3.5" />
+      </div>
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="bg-card border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+          {message.content || (
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+              <span className="flex gap-0.5">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="bg-muted-foreground/40 size-1.5 rounded-full animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s` }}
+                  />
+                ))}
+              </span>
+              Thinking…
+            </span>
+          )}
+        </div>
+        {message.sources && message.sources.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {message.sources.map((source, i) => (
+              <SourceChip key={`${source.doc_id}-${i}`} index={i + 1} source={source} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -206,15 +287,13 @@ function SourceChip({ index, source }: { index: number; source: SourceOut }) {
   return (
     <a
       href={`/dashboard/documents/${source.doc_id}`}
-      className="group bg-card text-muted-foreground hover:border-primary hover:text-primary relative flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors"
+      className="hover:border-primary/50 hover:text-primary group flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground transition-colors"
       title={source.preview}
     >
+      <FileText className="size-3 shrink-0" />
       <span className="font-semibold">[{index}]</span>
-      <span className="max-w-32 truncate">{source.doc_name}</span>
-      {source.page_number && (
-        <span className="text-muted-foreground/70">p.{source.page_number}</span>
-      )}
-      {source.is_ocr && <span className="text-muted-foreground/70">· OCR</span>}
+      <span className="max-w-36 truncate">{source.doc_name}</span>
+      {source.page_number && <span>· p.{source.page_number}</span>}
     </a>
   );
 }
