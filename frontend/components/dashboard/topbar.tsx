@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 
 const ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Overview",
@@ -19,8 +19,14 @@ export function DashboardTopBar() {
   const label = ROUTE_LABELS[pathname] ?? "Dashboard";
   const isRoot = pathname === "/dashboard";
 
+  const openPalette = () => {
+    document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true })
+    );
+  };
+
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background/80 px-6 backdrop-blur-sm">
+    <header className="flex h-12 shrink-0 items-center justify-between border-b bg-background/80 px-6 backdrop-blur-sm">
       {isRoot ? (
         <span className="text-sm font-medium">{label}</span>
       ) : (
@@ -35,6 +41,15 @@ export function DashboardTopBar() {
           <span className="font-medium">{label}</span>
         </nav>
       )}
+
+      <button
+        onClick={openPalette}
+        className="border-input text-muted-foreground hover:border-ring flex items-center gap-2 rounded-md border bg-transparent px-3 py-1.5 text-xs transition-colors"
+      >
+        <Search className="size-3" />
+        Search…
+        <kbd className="bg-muted ml-1 rounded px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+      </button>
     </header>
   );
 }

@@ -105,19 +105,24 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="llm_provider">Provider</Label>
-              <select
-                id="llm_provider"
-                {...register("llm_provider")}
-                className="border-input bg-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:outline-none"
-              >
+            <div className="space-y-2">
+              <Label>Provider</Label>
+              <div className="grid grid-cols-3 gap-2">
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value}>
-                    {p.label}
-                  </option>
+                  <label
+                    key={p.value}
+                    className={`flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-all hover:border-primary/50 ${
+                      selectedProvider === p.value
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "border-input"
+                    }`}
+                  >
+                    <input type="radio" value={p.value} {...register("llm_provider")} className="sr-only" />
+                    <span className="text-sm font-medium">{p.label}</span>
+                    <span className="text-muted-foreground text-[10px]">{p.placeholder}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="llm_model">Model</Label>
