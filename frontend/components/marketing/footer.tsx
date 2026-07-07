@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function MarketingFooter() {
   return (
     <footer className="border-t bg-secondary/30">
@@ -20,36 +22,36 @@ export function MarketingFooter() {
             <h4 className="text-sm font-medium">Product</h4>
             <ul className="mt-3 space-y-2.5 text-sm">
               <li>
-                <a
+                <Link
                   href="/#features"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Features
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/#how-it-works"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   How it works
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/pricing"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Pricing
-                </a>
+                </Link>
               </li>
               <li>
-                <a
+                <Link
                   href="/sign-up"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Get started
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
