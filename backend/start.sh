@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Railway provides DATABASE_URL as postgresql:// but psycopg3 needs postgresql+psycopg://
+# Railway provides DATABASE_URL as postgresql:// — convert to psycopg2 dialect
 if [[ "${DATABASE_URL}" == postgresql://* ]]; then
-    export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+psycopg://}"
+    export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+psycopg2://}"
 fi
 
 echo "Running database migrations..."

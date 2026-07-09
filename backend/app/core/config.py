@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,7 +13,14 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""  # error tracking; no-op if unset
 
     # Database
-    database_url: str = "postgresql+psycopg://knowledgeos:knowledgeos@localhost:5432/knowledgeos"
+    database_url: str = "postgresql+psycopg2://knowledgeos:knowledgeos@localhost:5432/knowledgeos"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def ensure_psycopg2_dialect(cls, v: str) -> str:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return v
 
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"

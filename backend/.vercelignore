@@ -1,0 +1,10 @@
+pyproject.toml
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+dump.rdb
+*.pyc
