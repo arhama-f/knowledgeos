@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useApi } from "@/lib/api";
-import type { ChunkPreview, DocumentOut, DocumentUploadResponse } from "@/lib/types";
+import type { ChunkPreview, DocumentOut } from "@/lib/types";
 
 export function useDocuments() {
   const api = useApi();
@@ -41,20 +41,9 @@ export function useUploadDocument() {
 
   return useMutation({
     mutationFn: async (file: File) => {
-      const { document, upload_url } = await api.post<DocumentUploadResponse>(
-        "/documents/upload-url",
-        { filename: file.name, content_type: file.type || "text/plain", size_bytes: file.size }
-      );
-
-      const putResponse = await fetch(upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "text/plain" },
-        body: file,
-      });
-      if (!putResponse.ok) throw new Error("Upload to storage failed");
-
-      await api.post(`/documents/${document.id}/process`);
-      return document;
+      const formData = new FormData();
+      formData.append("file", file);
+      return api.upload<DocumentOut>("/documents/upload", formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });

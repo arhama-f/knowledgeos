@@ -17,6 +17,14 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   });
 }
 
+async function setFrontendSession(): Promise<void> {
+  await fetch("/api/auth/session", { method: "POST" });
+}
+
+async function clearFrontendSession(): Promise<void> {
+  await fetch("/api/auth/session", { method: "DELETE" });
+}
+
 export async function signUp(data: {
   name: string;
   email: string;
@@ -26,9 +34,14 @@ export async function signUp(data: {
   const res = await authFetch("/auth/register", { method: "POST", body: JSON.stringify(data) });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail ?? "Registration failed");
+    const detail = err.detail;
+    throw new Error(
+      typeof detail === "string" ? detail : Array.isArray(detail) ? detail[0]?.msg : "Registration failed"
+    );
   }
-  return res.json();
+  const user = await res.json();
+  await setFrontendSession();
+  return user;
 }
 
 export async function signIn(email: string, password: string): Promise<AuthUser> {
@@ -40,11 +53,16 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail ?? "Invalid email or password");
   }
-  return res.json();
+  const user = await res.json();
+  await setFrontendSession();
+  return user;
 }
 
 export async function signOut(): Promise<void> {
-  await authFetch("/auth/logout", { method: "POST" });
+  await Promise.all([
+    authFetch("/auth/logout", { method: "POST" }),
+    clearFrontendSession(),
+  ]);
 }
 
 export async function getMe(): Promise<AuthUser | null> {

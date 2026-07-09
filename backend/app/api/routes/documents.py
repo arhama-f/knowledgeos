@@ -1,23 +1,32 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.registry import get_embedding_provider
 from app.api.deps import AuthContext, get_auth_context, require_admin
 from app.core.audit import record_audit
 from app.core.billing import QuotaExceeded, ensure_storage_quota
 from app.core.file_types import canonical_kind
 from app.core.rate_limit import rate_limit
 from app.db.session import get_db
-from app.models.document import Document, DocumentChunk, DocumentStatus, DocumentVersion
+from app.models.document import Document, DocumentChunk, DocumentStatus, DocumentVersion, ProcessingStage
+from app.models.embedding import Embedding
+from app.models.organization import Organization
 from app.schemas.document import (
     ChunkPreview,
     DocumentOut,
     DocumentUploadRequest,
     DocumentUploadResponse,
 )
+from app.services.chunking import chunk_pages
+from app.services.cleaning import clean_text
+from app.services.extractors.base import ExtractedPage
+from app.services.extractors.registry import UnsupportedFileType, get_extractor
+from app.services.metadata import extract_metadata
+from app.services.pipeline_status import fail, set_stage
 from app.services.storage import generate_presigned_download_url, generate_presigned_upload_url
 from app.tasks.ingestion import process_document_version
 
@@ -36,6 +45,140 @@ def list_documents(
         .order_by(Document.created_at.desc())
     )
     return list(db.execute(stmt).scalars())
+
+
+@router.post("/upload", response_model=DocumentOut, dependencies=[Depends(rate_limit(30))])
+async def upload_document(
+    file: UploadFile = File(...),
+    auth: AuthContext = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> Document:
+    """Direct upload + synchronous processing — no S3 or Celery required."""
+    file_kind = canonical_kind(file.filename or "")
+    if file_kind is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Unsupported file type for '{file.filename}'.",
+        )
+
+    content = await file.read()
+    size = len(content)
+
+    try:
+        ensure_storage_quota(db, auth.org_id, size)
+    except QuotaExceeded as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, exc.message) from exc
+
+    document = Document(
+        org_id=auth.org_id,
+        uploaded_by=auth.user_pk,
+        name=file.filename,
+        file_type=file_kind,
+        size_bytes=size,
+        status=DocumentStatus.PROCESSING.value,
+    )
+    db.add(document)
+    db.flush()
+
+    storage_key = f"{auth.org_id}/{document.id}/v1/{file.filename}"
+    version = DocumentVersion(
+        document_id=document.id,
+        version_number=1,
+        storage_key=storage_key,
+        file_type=file_kind,
+        size_bytes=size,
+        uploaded_by=auth.user_pk,
+        status=DocumentStatus.PROCESSING.value,
+    )
+    db.add(version)
+    db.commit()
+
+    try:
+        await _process_sync(db, document, version, content)
+    except Exception as exc:
+        fail(db, version, document, str(exc)[:2000])
+
+    db.refresh(document)
+    return document
+
+
+async def _process_sync(
+    db: Session, document: Document, version: DocumentVersion, content: bytes
+) -> None:
+    set_stage(db, version, document, ProcessingStage.OCR)
+    try:
+        extractor = get_extractor(document.name)
+    except UnsupportedFileType as exc:
+        fail(db, version, document, str(exc), stage=ProcessingStage.OCR)
+        return
+
+    pages = extractor.extract(content)
+
+    set_stage(db, version, document, ProcessingStage.CLEANING)
+    pages = [
+        ExtractedPage(page_number=p.page_number, text=clean_text(p.text), is_ocr=p.is_ocr)
+        for p in pages
+    ]
+
+    set_stage(db, version, document, ProcessingStage.METADATA_EXTRACTION)
+    meta = extract_metadata(pages)
+    for target in (version, document):
+        target.page_count = meta.page_count
+        target.word_count = meta.word_count
+        target.language = meta.language
+    version.char_count = meta.char_count
+
+    set_stage(db, version, document, ProcessingStage.CHUNKING)
+    chunks = chunk_pages(pages)
+    if not chunks:
+        fail(db, version, document, "No extractable text found.", ProcessingStage.CHUNKING)
+        return
+
+    chunk_records: list[DocumentChunk] = []
+    for chunk in chunks:
+        rec = DocumentChunk(
+            document_version_id=version.id,
+            org_id=document.org_id,
+            content=chunk.content,
+            chunk_index=chunk.chunk_index,
+            page_number=chunk.page_number,
+            is_ocr=chunk.is_ocr,
+        )
+        db.add(rec)
+        chunk_records.append(rec)
+    db.commit()
+    for rec in chunk_records:
+        db.refresh(rec)
+
+    set_stage(db, version, document, ProcessingStage.EMBEDDING)
+    org = db.get(Organization, document.org_id)
+    assert org is not None
+    provider_name = org.resolved_embedding_provider()
+    model = org.resolved_embedding_model()
+    embedding_provider = get_embedding_provider(provider_name)
+    vectors = await embedding_provider.embed([c.content for c in chunk_records], model)
+
+    for rec, vector in zip(chunk_records, vectors, strict=True):
+        db.add(Embedding(
+            chunk_id=rec.id,
+            org_id=document.org_id,
+            provider=provider_name,
+            model=model,
+            dimension=len(vector),
+            vector=vector,
+        ))
+    db.commit()
+
+    total = len(chunk_records)
+    version.status = DocumentStatus.READY.value
+    version.processing_stage = None
+    version.chunk_count = total
+    document.current_version_id = version.id
+    document.status = DocumentStatus.READY.value
+    document.processing_stage = None
+    document.chunk_count = total
+    document.error_message = None
+    db.commit()
 
 
 @router.post(

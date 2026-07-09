@@ -62,6 +62,14 @@ export function useApi() {
     [request]
   );
 
+  const upload = useCallback(
+    async <T>(path: string, formData: FormData): Promise<T> => {
+      const response = await request(path, { method: "POST", body: formData });
+      return response.json();
+    },
+    [request]
+  );
+
   const del = useCallback(
     async (path: string): Promise<void> => {
       await request(path, { method: "DELETE" });
@@ -69,5 +77,5 @@ export function useApi() {
     [request]
   );
 
-  return { request, get, post, patch, delete: del };
+  return { request, get, post, patch, upload, delete: del };
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/", "/pricing", "/sign-in", "/sign-up"];
+const PUBLIC_PREFIXES = ["/", "/pricing", "/sign-in", "/sign-up", "/api/"];
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -11,7 +11,7 @@ export default function middleware(req: NextRequest) {
   );
   if (isPublic) return NextResponse.next();
 
-  const token = req.cookies.get("access_token");
+  const token = req.cookies.get("session");
   if (!token) {
     return NextResponse.redirect(new URL("/sign-in", req.url));
   }
