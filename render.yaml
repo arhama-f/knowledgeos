@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: knowledgeos-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: DATABASE_URL
+        fromDatabase:
+          name: knowledgeos-db
+          property: connectionString
+      - key: REDIS_URL
+        value: redis://localhost:6379/0  # replace with Upstash URL for Celery workers
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: '["https://frontend-roan-two-76.vercel.app","https://localhost:3015"]'
+      - key: DEFAULT_LLM_PROVIDER
+        value: anthropic
+      - key: DEFAULT_LLM_MODEL
+        value: claude-sonnet-4-6
+      - key: DEFAULT_EMBEDDING_PROVIDER
+        value: openai
+      - key: DEFAULT_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: EMBEDDING_DIMENSIONS
+        value: "1536"
+      - key: S3_BUCKET
+        value: documents
+      - key: S3_REGION
+        value: us-east-1
+      - key: S3_USE_SSL
+        value: "true"
+      # Set these in the Render dashboard:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+
+databases:
+  - name: knowledgeos-db
+    plan: free
+    databaseName: knowledgeos
+    user: knowledgeos
