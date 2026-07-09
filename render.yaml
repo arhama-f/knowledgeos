@@ -37,12 +37,9 @@ services:
         value: us-east-1
       - key: S3_USE_SSL
         value: "true"
-      # Set these in the Render dashboard:
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
-        sync: false
-      - key: GEMINI_API_KEY
         sync: false
       - key: S3_ENDPOINT_URL
         sync: false
