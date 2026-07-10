@@ -42,8 +42,8 @@ class Settings(BaseSettings):
     default_llm_provider: str = "anthropic"
     default_llm_model: str = "claude-sonnet-4-6"
     default_embedding_provider: str = "gemini"
-    default_embedding_model: str = "models/text-embedding-004"
-    embedding_dimensions: int = 768
+    default_embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 1536
 
     openai_api_key: str = ""
     anthropic_api_key: str = ""

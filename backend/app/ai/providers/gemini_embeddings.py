@@ -1,4 +1,5 @@
 from google import genai
+from google.genai import types
 
 from app.ai.base import EmbeddingProvider
 from app.core.config import get_settings
@@ -13,8 +14,11 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
 
     async def embed(self, texts: list[str], model: str) -> list[list[float]]:
         embeddings: list[list[float]] = []
+        config = types.EmbedContentConfig(output_dimensionality=settings.embedding_dimensions)
         for i in range(0, len(texts), BATCH_SIZE):
             batch = texts[i : i + BATCH_SIZE]
-            response = await self._client.aio.models.embed_content(model=model, contents=batch)
+            response = await self._client.aio.models.embed_content(
+                model=model, contents=batch, config=config
+            )
             embeddings.extend(e.values for e in response.embeddings)
         return embeddings
