@@ -44,6 +44,25 @@ def _hit(key: str, limit: int, window_seconds: int) -> int | None:
         return None
 
 
+def ip_rate_limit(limit: int, window_seconds: int = 60) -> Callable[..., None]:
+    """Per-IP, per-path rate limit for unauthenticated routes (login, register, etc.)."""
+
+    def dependency(request: Request) -> None:
+        ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+            request.client.host if request.client else "unknown"
+        )
+        key = f"ip:{ip}:{request.url.path}"
+        retry_after = _hit(key, limit, window_seconds)
+        if retry_after is not None:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                "Too many requests. Please try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+
+    return dependency
+
+
 def rate_limit(limit: int, window_seconds: int = 60) -> Callable[..., None]:
     """Per-organization rate limit for authenticated, cost-sensitive routes
     (e.g. /ask, document processing) — keeps one org's usage from starving others."""

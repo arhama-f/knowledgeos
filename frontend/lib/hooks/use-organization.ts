@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { useApi } from "@/lib/api";
 import type { OrganizationOut } from "@/lib/types";
@@ -22,6 +23,10 @@ export function useUpdateOrganization() {
       api.patch<OrganizationOut>("/organizations/me", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization"] });
+      toast.success("AI settings saved");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to save settings");
     },
   });
 }
@@ -39,6 +44,10 @@ export function useUpdateBranding() {
     }) => api.patch<OrganizationOut>("/organizations/branding", body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization"] });
+      toast.success("Branding saved");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to save branding");
     },
   });
 }

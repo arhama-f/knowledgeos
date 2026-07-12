@@ -1,0 +1,84 @@
+name: knowledgeos
+
+services:
+  - name: api
+    type: web
+    git:
+      repository: github.com/arhama-f/knowledgeos
+      branch: main
+    build:
+      builder: dockerfile
+      dockerfile: backend/Dockerfile
+      context: backend
+    instance_types:
+      - type: nano
+    regions:
+      - fra
+    scaling:
+      min: 1
+      max: 1
+    ports:
+      - port: 8000
+        protocol: http
+    routes:
+      - path: /
+        port: 8000
+    health_checks:
+      - protocol: http
+        path: /health
+        port: 8000
+        grace_period: 20
+        interval: 60
+        timeout: 5
+        restart_limit: 3
+    env:
+      - name: ENVIRONMENT
+        value: production
+      - name: LOG_LEVEL
+        value: INFO
+      - name: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - name: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+      - name: DEFAULT_LLM_PROVIDER
+        value: anthropic
+      - name: DEFAULT_LLM_MODEL
+        value: claude-sonnet-4-6
+      - name: DEFAULT_EMBEDDING_PROVIDER
+        value: openai
+      - name: DEFAULT_EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - name: EMBEDDING_DIMENSIONS
+        value: "1536"
+      - name: S3_BUCKET
+        value: documents
+      - name: S3_REGION
+        value: auto
+      - name: S3_USE_SSL
+        value: "true"
+      - name: APP_URL
+        value: https://knowledgeos.psychflo.com
+      - name: CORS_ORIGINS
+        value: '["https://knowledgeos.psychflo.com"]'
+      - name: RESEND_FROM_EMAIL
+        value: "KnowledgeOS <noreply@psychflo.com>"
+
+      # Set these as secrets in Koyeb dashboard → Secrets, then reference them here
+      - name: DATABASE_URL
+        secret: knowledgeos-database-url
+      - name: REDIS_URL
+        secret: knowledgeos-redis-url
+      - name: SECRET_KEY
+        secret: knowledgeos-secret-key
+      - name: ANTHROPIC_API_KEY
+        secret: knowledgeos-anthropic-key
+      - name: OPENAI_API_KEY
+        secret: knowledgeos-openai-key
+      - name: S3_ENDPOINT_URL
+        secret: knowledgeos-s3-endpoint
+      - name: S3_ACCESS_KEY
+        secret: knowledgeos-s3-access-key
+      - name: S3_SECRET_KEY
+        secret: knowledgeos-s3-secret-key
+      - name: RESEND_API_KEY
+        secret: knowledgeos-resend-key

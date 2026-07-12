@@ -14,21 +14,39 @@ async function readErrorMessage(response: Response): Promise<string> {
   }
 }
 
+async function tryRefresh(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export function useApi() {
   const request = useCallback(async (path: string, init: RequestInit = {}): Promise<Response> => {
     const headers = new Headers(init.headers);
     if (init.body && !(init.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
     }
-    const response = await fetch(`${API_BASE}${path}`, {
-      ...init,
-      headers,
-      credentials: "include",
-    });
-    if (!response.ok) {
+    const opts = { ...init, headers, credentials: "include" as RequestCredentials };
+    let response = await fetch(`${API_BASE}${path}`, opts);
+
+    if (response.status === 401) {
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        response = await fetch(`${API_BASE}${path}`, opts);
+      }
       if (response.status === 401) {
         window.location.href = "/sign-in";
+        throw new Error("Session expired");
       }
+    }
+
+    if (!response.ok) {
       throw new Error(await readErrorMessage(response));
     }
     return response;

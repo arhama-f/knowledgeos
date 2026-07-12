@@ -59,9 +59,9 @@ const STEPS = [
 ];
 
 const PROVIDER_LIST = [
-  { name: "Anthropic Claude", active: true },
-  { name: "OpenAI GPT-4o", active: false },
-  { name: "Google Gemini", active: false },
+  { name: "State-of-the-art LLMs", active: true },
+  { name: "Provider-agnostic", active: false },
+  { name: "No vendor lock-in", active: false },
 ];
 
 const FORMAT_LIST = ["PDF", "DOCX", "XLSX", "PPTX", "PNG", "TXT"];
@@ -106,7 +106,7 @@ export default function LandingPage() {
             <div className="flex justify-center">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-white/55 backdrop-blur-sm">
                 <span className="badge-dot size-1.5 rounded-full bg-emerald-400" />
-                Powered by OpenAI, Anthropic &amp; Gemini
+                Enterprise AI, ready to deploy
               </span>
             </div>
 
@@ -209,7 +209,7 @@ export default function LandingPage() {
                   <div className="mx-auto flex w-64 items-center gap-2 rounded-md bg-white/5 px-3 py-1.5">
                     <div className="size-1.5 rounded-full bg-emerald-400/60" />
                     <span className="text-[11px] text-white/25">
-                      app.knowledgeos.ai/dashboard/ask
+                      knowledgeos.psychflo.com/dashboard/ask
                     </span>
                   </div>
                   <div className="w-[60px]" />
@@ -440,8 +440,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-lg font-semibold">Your choice of AI</h3>
               <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-                Switch between OpenAI, Anthropic, and Gemini per organization. No migrations, no
-                code changes.
+                Swap AI providers per organization with zero migrations and zero code changes. Bring your own model.
               </p>
               <div className="mt-5 space-y-1.5">
                 {PROVIDER_LIST.map((p) => (

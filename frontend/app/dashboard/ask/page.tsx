@@ -3,11 +3,14 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileText, MessageSquare, Plus, Send, Sparkles } from "lucide-react";
+import { Check, Copy, FileText, MessageSquare, Plus, Send, Sparkles, Square, Trash2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useChatMessages, useChatSessions } from "@/lib/hooks/use-chat";
+import { useChatMessages, useChatSessions, useDeleteSession } from "@/lib/hooks/use-chat";
 import { streamAsk } from "@/lib/stream-ask";
 import type { SourceOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -45,6 +48,7 @@ function AskPageInner() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { data: sessions } = useChatSessions();
+  const deleteSession = useDeleteSession();
   const { data: historyMessages } = useChatMessages(sessionId);
 
   useEffect(() => {
@@ -96,13 +100,10 @@ function AskPageInner() {
         setIsStreaming(false);
         queryClient.invalidateQueries({ queryKey: ["chat-sessions"] });
       },
-      onError: () => {
+      onError: (err) => {
         setIsStreaming(false);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, content: "Sorry, something went wrong." } : m
-          )
-        );
+        toast.error(err.message || "Failed to get an answer. Please try again.");
+        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgId));
       },
     });
   };
@@ -135,22 +136,39 @@ function AskPageInner() {
           {sessions && sessions.length > 0 ? (
             <div className="space-y-0.5">
               {sessions.map((session) => (
-                <button
+                <div
                   key={session.id}
-                  onClick={() => {
-                    setSessionId(session.id);
-                    router.replace(`/dashboard/ask?session=${session.id}`);
-                  }}
                   className={cn(
-                    "flex w-full items-center gap-2 truncate rounded-md px-3 py-2 text-left text-sm transition-colors",
+                    "group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
                     sessionId === session.id
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                   )}
                 >
-                  <MessageSquare className="size-3.5 shrink-0" />
-                  <span className="truncate">{session.title || "Untitled conversation"}</span>
-                </button>
+                  <button
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    onClick={() => {
+                      setSessionId(session.id);
+                      router.replace(`/dashboard/ask?session=${session.id}`);
+                    }}
+                  >
+                    <MessageSquare className="size-3.5 shrink-0" />
+                    <span className="truncate">{session.title || "Untitled conversation"}</span>
+                  </button>
+                  <button
+                    aria-label="Delete conversation"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (session.id === sessionId) {
+                        startNewChat();
+                      }
+                      deleteSession.mutate(session.id);
+                    }}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
               ))}
             </div>
           ) : (
@@ -192,14 +210,27 @@ function AskPageInner() {
                 className="min-h-0 flex-1 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm"
                 rows={1}
               />
-              <Button
-                size="icon"
-                className="size-8 shrink-0 rounded-lg"
-                onClick={handleSend}
-                disabled={isStreaming || !input.trim()}
-              >
-                <Send className="size-3.5" />
-              </Button>
+              {isStreaming ? (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="size-8 shrink-0 rounded-lg"
+                  onClick={() => setIsStreaming(false)}
+                  aria-label="Stop generating"
+                  title="Stop generating"
+                >
+                  <Square className="size-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  className="size-8 shrink-0 rounded-lg"
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                >
+                  <Send className="size-3.5" />
+                </Button>
+              )}
             </div>
             <p className="text-muted-foreground mt-1.5 text-center text-[11px]">
               Enter to send · Shift+Enter for new line
@@ -236,6 +267,23 @@ function EmptyChat({ onSuggestion }: { onSuggestion: (q: string) => void }) {
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      aria-label="Copy response"
+      className="text-muted-foreground/60 hover:text-muted-foreground rounded p-1 transition-colors"
+    >
+      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+    </button>
+  );
+}
+
 function MessageBubble({ message }: { message: DisplayMessage }) {
   const isUser = message.role === "user";
 
@@ -255,8 +303,18 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
         <Sparkles className="text-primary size-3.5" />
       </div>
       <div className="flex-1 min-w-0 space-y-2">
-        <div className="bg-card border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
-          {message.content || (
+        <div className="bg-card border rounded-2xl rounded-tl-sm px-4 py-3 text-sm leading-relaxed">
+          {message.content ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none
+              prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1
+              prose-li:my-0 prose-pre:bg-muted prose-pre:text-foreground
+              prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none
+              prose-a:text-primary prose-strong:font-semibold">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          ) : (
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <span className="flex gap-0.5">
                 {[0, 1, 2].map((i) => (
@@ -271,13 +329,20 @@ function MessageBubble({ message }: { message: DisplayMessage }) {
             </span>
           )}
         </div>
-        {message.sources && message.sources.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {message.sources.map((source, i) => (
-              <SourceChip key={`${source.doc_id}-${i}`} index={i + 1} source={source} />
-            ))}
-          </div>
-        )}
+        <div className="flex items-center justify-between gap-2">
+          {message.sources && message.sources.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {message.sources.map((source, i) => (
+                <SourceChip key={`${source.doc_id}-${i}`} index={i + 1} source={source} />
+              ))}
+            </div>
+          )}
+          {message.content && (
+            <div className="ml-auto shrink-0">
+              <CopyButton text={message.content} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

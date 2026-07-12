@@ -2,10 +2,11 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { FileText, RotateCcw, Trash2, UploadCloud } from "lucide-react";
+import { FileText, RotateCcw, Search, Trash2, UploadCloud, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -16,6 +17,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { DocumentStatusBadge } from "@/components/dashboard/document-status-badge";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -42,16 +54,17 @@ export default function DocumentsPage() {
   const remove = useDeleteDocument();
   const retry = useRetryDocument();
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setUploadError(null);
-    Array.from(files).forEach((file) => {
-      upload.mutate(file, { onError: (err) => setUploadError(err.message) });
-    });
+    Array.from(files).forEach((file) => upload.mutate(file));
   };
+
+  const filtered = documents?.filter((doc) =>
+    doc.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-8">
@@ -99,18 +112,42 @@ export default function DocumentsPage() {
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
           />
-          {uploadError && <p className="text-destructive text-sm">{uploadError}</p>}
         </CardContent>
       </Card>
 
       <Card>
+        {/* Search bar */}
+        {documents && documents.length > 0 && (
+          <div className="border-b px-4 py-3">
+            <div className="relative max-w-xs">
+              <Search className="text-muted-foreground absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search documents…"
+                className="h-8 pl-8 pr-8 text-sm"
+                aria-label="Search documents"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="text-muted-foreground hover:text-foreground absolute right-2.5 top-1/2 -translate-y-1/2"
+                  aria-label="Clear search"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <CardContent className="space-y-2 p-6">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </CardContent>
-        ) : documents && documents.length > 0 ? (
+        ) : filtered && filtered.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -123,7 +160,7 @@ export default function DocumentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {documents.map((doc) => (
+              {filtered.map((doc) => (
                 <TableRow key={doc.id}>
                   <TableCell>
                     <Link
@@ -154,24 +191,56 @@ export default function DocumentsPage() {
                         size="icon"
                         onClick={() => retry.mutate(doc.id)}
                         disabled={retry.isPending}
-                        title="Retry"
+                        aria-label="Retry processing"
+                        title="Retry processing"
                       >
                         <RotateCcw className="size-4" />
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove.mutate(doc.id)}
-                      disabled={remove.isPending}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={remove.isPending}
+                          aria-label={`Delete ${doc.name}`}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete document?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            <strong>{doc.name}</strong> and all its indexed chunks will be
+                            permanently removed. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => remove.mutate(doc.id)}>
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        ) : documents && documents.length > 0 && search ? (
+          <CardContent className="py-10 text-center">
+            <p className="text-muted-foreground text-sm">
+              No documents match <strong>&ldquo;{search}&rdquo;</strong>
+            </p>
+            <button
+              onClick={() => setSearch("")}
+              className="text-primary mt-1 text-sm hover:underline"
+            >
+              Clear search
+            </button>
+          </CardContent>
         ) : (
           <CardContent>
             <EmptyState icon={FileText} title="No documents uploaded yet." />

@@ -35,6 +35,15 @@ class Settings(BaseSettings):
 
     # JWT auth
     secret_key: str = "dev-secret-change-in-production"
+
+    @field_validator("secret_key", mode="after")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        import os
+        if os.environ.get("ENVIRONMENT", "development") == "production" and len(v) < 32:
+            raise ValueError("SECRET_KEY must be at least 32 characters in production")
+        return v
+
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
 
@@ -57,7 +66,13 @@ class Settings(BaseSettings):
     # Retrieval
     retrieval_top_k: int = 6
 
-    cors_origins: list[str] = ["http://localhost:3015"]
+    cors_origins: list[str] = ["http://localhost:3015", "https://knowledgeos.psychflo.com"]
+
+    # Email (Resend)
+    resend_api_key: str = ""
+    resend_from_email: str = "KnowledgeOS <noreply@knowledgeos.psychflo.com>"
+    app_url: str = "https://knowledgeos.psychflo.com"
+
 
 
 @lru_cache

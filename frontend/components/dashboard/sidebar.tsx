@@ -33,12 +33,23 @@ const SETTINGS_NAV = [
   { href: "/dashboard/settings/api-keys", label: "API Keys", icon: KeyRound },
 ];
 
-function NavLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const active = pathname === href;
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         active
@@ -52,13 +63,12 @@ function NavLink({ href, label, icon: Icon }: { href: string; label: string; ico
   );
 }
 
-export function Sidebar() {
+export function SidebarContents({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
   const { data: authUser } = useCurrentUser();
   const { data: org } = useOrganization();
   const invalidate = useInvalidateAuth();
-  const isAdmin = authUser?.role === "admin";
 
   async function handleSignOut() {
     await signOut();
@@ -67,7 +77,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="bg-card flex h-full w-64 shrink-0 flex-col border-r">
+    <div className="flex h-full flex-col">
       {/* Org header */}
       <div className="flex items-center gap-2.5 border-b px-5 py-4">
         {org?.logo_url ? (
@@ -104,7 +114,7 @@ export function Sidebar() {
       <nav className="flex-1 overflow-y-auto px-3 py-3">
         <div className="space-y-0.5">
           {MAIN_NAV.map((item) => (
-            <NavLink key={item.href} {...item} />
+            <NavLink key={item.href} {...item} onNavigate={onNavigate} />
           ))}
         </div>
 
@@ -114,11 +124,12 @@ export function Sidebar() {
           </p>
           <div className="space-y-0.5">
             {SETTINGS_NAV.map((item) => (
-              <NavLink key={item.href} {...item} />
+              <NavLink key={item.href} {...item} onNavigate={onNavigate} />
             ))}
-            {isAdmin && (
+            {authUser?.role === "admin" && (
               <Link
                 href="/dashboard/admin"
+                onClick={onNavigate}
                 className={cn(
                   "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   pathname?.startsWith("/dashboard/admin")
@@ -133,6 +144,26 @@ export function Sidebar() {
           </div>
         </div>
       </nav>
+
+      {/* PsychFlo attribution */}
+      <div className="px-5 pb-2">
+        <a
+          href="https://psychflo.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-muted-foreground/60 hover:text-muted-foreground flex items-center gap-1.5 text-[10px] transition-colors"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/psychflo-logo.png"
+            alt="PsychFlo"
+            width={12}
+            height={12}
+            className="opacity-40 dark:invert"
+          />
+          A product of PsychFlo
+        </a>
+      </div>
 
       {/* User footer */}
       <div className="border-t px-4 py-3">
@@ -155,6 +186,14 @@ export function Sidebar() {
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <aside className="bg-card hidden h-full w-64 shrink-0 flex-col border-r md:flex">
+      <SidebarContents />
     </aside>
   );
 }

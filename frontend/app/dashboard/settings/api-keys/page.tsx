@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -84,7 +85,11 @@ export default function ApiKeysPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => navigator.clipboard.writeText(newSecret)}
+                      aria-label="Copy API key"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newSecret);
+                        toast.success("API key copied to clipboard");
+                      }}
                     >
                       <Copy className="size-4" />
                     </Button>
@@ -155,6 +160,7 @@ export default function ApiKeysPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label={`Revoke ${key.name}`}
                         onClick={() => revokeKey.mutate(key.id)}
                         disabled={revokeKey.isPending}
                       >

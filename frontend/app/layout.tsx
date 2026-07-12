@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import { Toaster } from "sonner";
+
 import { QueryProvider } from "@/lib/query-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +18,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "KnowledgeOS — Enterprise AI Knowledge Platform",
+  title: {
+    default: "KnowledgeOS — Enterprise AI Knowledge Platform",
+    template: "%s — KnowledgeOS",
+  },
   description: "Upload your company's documents. Ask anything. Get cited answers instantly.",
+  openGraph: {
+    type: "website",
+    siteName: "KnowledgeOS",
+    title: "KnowledgeOS — Enterprise AI Knowledge Platform",
+    description: "Upload your company's documents. Ask anything. Get cited answers instantly.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "KnowledgeOS — Enterprise AI Knowledge Platform",
+    description: "Upload your company's documents. Ask anything. Get cited answers instantly.",
+  },
 };
 
 export default function RootLayout({
@@ -25,9 +42,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`} suppressHydrationWarning>
       <body className="h-full antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <ThemeProvider>
+          <QueryProvider>
+            {children}
+            <Toaster richColors closeButton position="bottom-right" />
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

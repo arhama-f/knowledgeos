@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import {
   useUpdateBranding,
   useUpdateOrganization,
 } from "@/lib/hooks/use-organization";
+import { useChangePassword, useCurrentUser, useUpdateProfile } from "@/lib/hooks/use-auth";
 import {
   brandingSchema,
   orgSettingsSchema,
@@ -72,6 +73,10 @@ export default function SettingsPage() {
         title="Settings"
         description="Manage your organization's plan, branding, and AI configuration."
       />
+
+      <ProfileSection />
+
+      <ChangePasswordSection />
 
       <Card>
         <CardHeader>
@@ -292,6 +297,144 @@ function BrandingCard({ org }: { org: OrganizationOut | undefined }) {
           )}
           <Button type="submit" disabled={!isDirty || updateBranding.isPending}>
             {updateBranding.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
+function ChangePasswordSection() {
+  const changePassword = useChangePassword();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [mismatch, setMismatch] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setMismatch(true);
+      return;
+    }
+    setMismatch(false);
+    changePassword.mutate(
+      { current_password: currentPassword, new_password: newPassword },
+      {
+        onSuccess: () => {
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        },
+      }
+    );
+  };
+
+  return (
+    <Card>
+      <form onSubmit={handleSubmit}>
+        <CardHeader>
+          <CardTitle className="text-base">Change password</CardTitle>
+          <CardDescription>Choose a new password for your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="current-password">Current password</Label>
+            <Input
+              id="current-password"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="new-password">New password</Label>
+            <Input
+              id="new-password"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+              minLength={8}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirm-password">Confirm new password</Label>
+            <Input
+              id="confirm-password"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => {
+                setConfirmPassword(e.target.value);
+                setMismatch(false);
+              }}
+              autoComplete="new-password"
+            />
+            {mismatch && (
+              <p className="text-destructive text-sm">Passwords do not match</p>
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="justify-end">
+          <Button
+            type="submit"
+            disabled={
+              !currentPassword || !newPassword || !confirmPassword || changePassword.isPending
+            }
+          >
+            {changePassword.isPending ? "Saving…" : "Change password"}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
+  );
+}
+
+function ProfileSection() {
+  const { data: user, isLoading } = useCurrentUser();
+  const updateProfile = useUpdateProfile();
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (user?.name) setName(user.name);
+  }, [user?.name]);
+
+  return (
+    <Card>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim()) updateProfile.mutate(name.trim());
+        }}
+      >
+        <CardHeader>
+          <CardTitle className="text-base">Your profile</CardTitle>
+          <CardDescription>Update your display name.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-email">Email</Label>
+            <Input id="profile-email" value={user?.email ?? ""} disabled className="bg-muted/50" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="profile-name">Display name</Label>
+            {isLoading ? (
+              <Skeleton className="h-9 w-full" />
+            ) : (
+              <Input
+                id="profile-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your full name"
+                maxLength={200}
+              />
+            )}
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-end gap-3">
+          <Button type="submit" disabled={!name.trim() || updateProfile.isPending}>
+            {updateProfile.isPending ? "Saving…" : "Save changes"}
           </Button>
         </CardFooter>
       </form>

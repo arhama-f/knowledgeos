@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { useApi } from "@/lib/api";
 import type { ChunkPreview, DocumentOut } from "@/lib/types";
@@ -41,12 +42,21 @@ export function useUploadDocument() {
 
   return useMutation({
     mutationFn: async (file: File) => {
+      if (file.size > 4 * 1024 * 1024) {
+        throw new Error(
+          `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — files must be under 4 MB.`
+        );
+      }
       const formData = new FormData();
       formData.append("file", file);
       return api.upload<DocumentOut>("/documents/upload", formData);
     },
-    onSuccess: () => {
+    onSuccess: (doc) => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success(`"${doc.name}" uploaded and indexed`);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Upload failed");
     },
   });
 }
@@ -59,6 +69,10 @@ export function useDeleteDocument() {
     mutationFn: (documentId: string) => api.delete(`/documents/${documentId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
+      toast.success("Document deleted");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to delete document");
     },
   });
 }
@@ -72,6 +86,9 @@ export function useRetryDocument() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
+    onError: (err: Error) => {
+      toast.error(err.message || "Retry failed — please re-upload the document");
+    },
   });
 }
 
@@ -82,6 +99,9 @@ export function useDownloadOriginal() {
     mutationFn: async (documentId: string) => {
       const { url } = await api.get<{ url: string }>(`/documents/${documentId}/download-url`);
       window.open(url, "_blank");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Download failed");
     },
   });
 }

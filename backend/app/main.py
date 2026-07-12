@@ -1,6 +1,11 @@
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
+
+logger = logging.getLogger("knowledgeos")
 
 from app.api.routes import (
     api_keys,
@@ -49,8 +54,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"],
+    allow_headers=["Authorization", "Content-Type", "X-Api-Key"],
 )
 
 app.include_router(health.router)
@@ -67,4 +72,13 @@ app.include_router(audit_logs.router, prefix="/api")
 app.include_router(departments.router, prefix="/api")
 app.include_router(billing.router, prefix="/api")
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.exception("unhandled_error", extra={"path": str(request.url.path)})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again."},
+    )
+
+
+Instrumentator().instrument(app)

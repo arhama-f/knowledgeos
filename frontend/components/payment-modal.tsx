@@ -1,25 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Building2, CheckCircle2, CreditCard } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-const BANK_DETAILS = [
-  { label: "Account name", value: "PsychFlo" },
-  { label: "Account number", value: "75872793" },
-  { label: "Sort code", value: "60-84-64" },
-  { label: "SWIFT/BIC", value: "TRWIGB2LXXX" },
-  { label: "Bank", value: "Wise" },
-  { label: "Currency", value: "GBP (£)" },
+const WISE_LINKS: Record<string, string> = {
+  Starter: process.env.NEXT_PUBLIC_WISE_LINK_STARTER ?? "#",
+  Business: process.env.NEXT_PUBLIC_WISE_LINK_BUSINESS ?? "#",
+};
+
+type Method = "card" | "bank";
+
+const METHODS: { id: Method; icon: React.ElementType; title: string; description: string }[] = [
+  {
+    id: "card",
+    icon: CreditCard,
+    title: "Pay by card",
+    description: "Visa, Mastercard, Amex — via Wise's secure payment page.",
+  },
+  {
+    id: "bank",
+    icon: Building2,
+    title: "Bank transfer",
+    description: "GBP, USD, or EUR. We'll email our bank details within 1 business day.",
+  },
 ];
 
 interface PaymentModalProps {
@@ -31,69 +44,114 @@ interface PaymentModalProps {
 
 export function PaymentModal({ open, onOpenChange, planName, priceLabel }: PaymentModalProps) {
   const [confirmed, setConfirmed] = useState(false);
+  const [method, setMethod] = useState<Method | null>(null);
+  const [selected, setSelected] = useState<Method | null>(null);
+
+  function reset() {
+    setConfirmed(false);
+    setMethod(null);
+    setSelected(null);
+  }
+
+  function handleContinue() {
+    if (!selected) return;
+    setMethod(selected);
+    if (selected === "card") {
+      const link = WISE_LINKS[planName];
+      window.open(link, "_blank", "noopener,noreferrer");
+    }
+    setConfirmed(true);
+  }
 
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
         onOpenChange(next);
-        if (!next) setConfirmed(false);
+        if (!next) reset();
       }}
     >
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         {confirmed ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>You&apos;re all set</DialogTitle>
-              <DialogDescription>
-                We&apos;ll activate your {planName} plan within 1 business day of receiving payment.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="bg-muted text-muted-foreground rounded-lg p-4 text-sm">
-              <p>What happens next:</p>
-              <ul className="mt-2 list-disc space-y-1 pl-4">
-                <li>Send the transfer using your company name as the reference</li>
-                <li>We&apos;ll email you once your workspace is activated</li>
-                <li>
-                  Questions? Email{" "}
-                  <a href="mailto:hello@knowledgeos.ai" className="text-primary">
-                    hello@knowledgeos.ai
-                  </a>
-                </li>
-              </ul>
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <CheckCircle2 className="size-7 text-primary" />
             </div>
-            <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Done</Button>
-            </DialogFooter>
-          </>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {method === "card" ? "Payment page opened" : "We'll be in touch"}
+              </h2>
+              <p className="text-muted-foreground mt-1.5 text-sm">
+                {method === "card"
+                  ? `Complete your payment on the Wise page that just opened. Your ${planName} workspace will be activated within 1 business day of receipt.`
+                  : `Thanks for choosing the ${planName} plan. We'll email our bank details within 1 business day and activate your workspace on receipt.`}
+              </p>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Questions?{" "}
+              <a
+                href="mailto:hello@knowledgeos.ai"
+                className="text-primary underline-offset-4 hover:underline"
+              >
+                hello@knowledgeos.ai
+              </a>
+            </p>
+            {method === "card" && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => window.open(WISE_LINKS[planName], "_blank", "noopener,noreferrer")}
+              >
+                Reopen payment page
+              </Button>
+            )}
+            <Button className="w-full" onClick={() => onOpenChange(false)}>
+              Done
+            </Button>
+          </div>
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Pay via bank transfer</DialogTitle>
+              <DialogTitle>How would you like to pay?</DialogTitle>
               <DialogDescription>
-                {planName} plan — {priceLabel}. Use your company name as the payment reference.
+                {planName} plan — {priceLabel}.
               </DialogDescription>
             </DialogHeader>
-            <div className="bg-muted/40 space-y-2 rounded-lg border p-4">
-              {BANK_DETAILS.map((detail) => (
-                <div key={detail.label} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{detail.label}</span>
-                  <button
-                    type="button"
-                    className="hover:text-primary flex items-center gap-1.5 font-medium"
-                    onClick={() => navigator.clipboard.writeText(detail.value)}
+
+            <div className="grid grid-cols-2 gap-3">
+              {METHODS.map(({ id, icon: Icon, title, description }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSelected(id)}
+                  className={cn(
+                    "flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-colors",
+                    selected === id
+                      ? "border-primary bg-primary/5 ring-1 ring-primary"
+                      : "hover:bg-muted/50"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-lg",
+                      selected === id ? "bg-primary text-primary-foreground" : "bg-muted"
+                    )}
                   >
-                    {detail.value}
-                    <Copy className="size-3.5" />
-                  </button>
-                </div>
+                    <Icon className="size-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{title}</p>
+                    <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                      {description}
+                    </p>
+                  </div>
+                </button>
               ))}
             </div>
-            <DialogFooter>
-              <Button onClick={() => setConfirmed(true)}>
-                <Check className="size-4" /> I&apos;ve sent the payment
-              </Button>
-            </DialogFooter>
+
+            <Button className="w-full" disabled={!selected} onClick={handleContinue}>
+              Continue
+            </Button>
           </>
         )}
       </DialogContent>

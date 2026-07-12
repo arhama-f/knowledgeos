@@ -1,9 +1,7 @@
-import json
 import uuid
-from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -32,7 +30,7 @@ async def ask(
     body: AskRequest,
     auth: AuthContext = Depends(get_auth_context),
     db: Session = Depends(get_db),
-) -> StreamingResponse:
+) -> dict:
     try:
         ensure_ai_quota(db, auth.org_id)
     except QuotaExceeded as exc:
@@ -62,32 +60,35 @@ async def ask(
     llm = get_llm_provider(llm_provider_name)
     llm_model = org.resolved_llm_model()
 
-    async def event_stream() -> AsyncIterator[bytes]:
-        yield _sse({"type": "meta", "session_id": str(session.id), "sources": sources})
-        full_text = ""
-        async for delta in llm.stream(messages, llm_model):
-            full_text += delta
-            yield _sse({"type": "delta", "text": delta})
+    full_text = ""
+    async for delta in llm.stream(messages, llm_model):
+        full_text += delta
 
-        assistant_message = Message(
-            session_id=session.id,
-            org_id=auth.org_id,
-            role="assistant",
-            content=full_text,
-            provider=llm_provider_name,
-            model=llm_model,
-        )
-        db.add(assistant_message)
+    assistant_message = Message(
+        session_id=session.id,
+        org_id=auth.org_id,
+        role="assistant",
+        content=full_text,
+        provider=llm_provider_name,
+        model=llm_model,
+    )
+    db.add(assistant_message)
+    db.commit()
+    persist_citations(db, assistant_message.id, chunks)
+
+    if not session.title:
+        session.title = body.question[:80]
         db.commit()
-        persist_citations(db, assistant_message.id, chunks)
-        yield _sse({"type": "done"})
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return {"session_id": str(session.id), "answer": full_text, "sources": sources}
 
 
 @router.get("/sessions", response_model=list[ChatSessionOut])
 def list_sessions(
-    auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)
+    skip: int = Query(default=0, ge=0, le=10000),
+    limit: int = Query(default=50, ge=1, le=200),
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
 ) -> list[ChatSession]:
     stmt = (
         select(ChatSession)
@@ -97,6 +98,8 @@ def list_sessions(
             ChatSession.deleted_at.is_(None),
         )
         .order_by(ChatSession.created_at.desc())
+        .offset(skip)
+        .limit(min(limit, 200))
     )
     return list(db.execute(stmt).scalars())
 
@@ -129,8 +132,17 @@ def list_messages(
     ]
 
 
-def _sse(payload: dict) -> bytes:
-    return f"data: {json.dumps(payload)}\n\n".encode()
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_session(
+    session_id: uuid.UUID,
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
+) -> None:
+    session = db.get(ChatSession, session_id)
+    if not session or session.org_id != auth.org_id or session.user_id != auth.user_pk:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Session not found")
+    session.deleted_at = datetime.now(timezone.utc)
+    db.commit()
 
 
 def _get_or_create_session(

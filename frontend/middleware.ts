@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/", "/pricing", "/sign-in", "/sign-up", "/api/"];
+const PUBLIC_PREFIXES = ["/", "/pricing", "/sign-in", "/sign-up", "/api/", "/forgot-password", "/reset-password", "/invite/"];
 
 export default function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

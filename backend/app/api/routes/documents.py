@@ -1,7 +1,9 @@
 import uuid
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from pathlib import Path as FilePath
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,21 +30,26 @@ from app.services.extractors.registry import UnsupportedFileType, get_extractor
 from app.services.metadata import extract_metadata
 from app.services.pipeline_status import fail, set_stage
 from app.services.storage import generate_presigned_download_url, generate_presigned_upload_url
-from app.tasks.ingestion import process_document_version
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 MAX_RETRY_COUNT = 5
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024  # 4 MB — stay under Vercel's 4.5 MB body limit
 
 
 @router.get("", response_model=list[DocumentOut])
 def list_documents(
-    auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)
+    skip: int = Query(default=0, ge=0, le=10000),
+    limit: int = Query(default=50, ge=1, le=200),
+    auth: AuthContext = Depends(get_auth_context),
+    db: Session = Depends(get_db),
 ) -> list[Document]:
     stmt = (
         select(Document)
         .where(Document.org_id == auth.org_id, Document.deleted_at.is_(None))
         .order_by(Document.created_at.desc())
+        .offset(skip)
+        .limit(min(limit, 200))
     )
     return list(db.execute(stmt).scalars())
 
@@ -64,6 +71,13 @@ async def upload_document(
     content = await file.read()
     size = len(content)
 
+    if size > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"File exceeds the 4 MB limit ({size / 1024 / 1024:.1f} MB). "
+            "Split large documents or contact support for higher limits.",
+        )
+
     try:
         ensure_storage_quota(db, auth.org_id, size)
     except QuotaExceeded as exc:
@@ -80,7 +94,8 @@ async def upload_document(
     db.add(document)
     db.flush()
 
-    storage_key = f"{auth.org_id}/{document.id}/v1/{file.filename}"
+    safe_name = FilePath(file.filename or "file").name
+    storage_key = f"{auth.org_id}/{document.id}/v1/{safe_name}"
     version = DocumentVersion(
         document_id=document.id,
         version_number=1,
@@ -213,7 +228,7 @@ def create_upload_url(
     db.add(document)
     db.flush()
 
-    storage_key = f"{auth.org_id}/{document.id}/v1/{body.filename}"
+    storage_key = f"{auth.org_id}/{document.id}/v1/{FilePath(body.filename).name}"
     version = DocumentVersion(
         document_id=document.id,
         version_number=1,
@@ -233,16 +248,16 @@ def create_upload_url(
     )
 
 
-@router.post("/{document_id}/process", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/{document_id}/process", status_code=status.HTTP_400_BAD_REQUEST)
 def trigger_processing(
     document_id: uuid.UUID,
     auth: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
-    _get_owned_document(db, document_id, auth.org_id)
-    version = _latest_version(db, document_id)
-    process_document_version.delay(str(version.id))
-    return {"status": "queued"}
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        "Background processing is not available. Please delete and re-upload the document.",
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
@@ -273,26 +288,10 @@ def retry_document(
             "check the error and consider re-uploading instead.",
         )
 
-    version.retry_count += 1
-    version.status = DocumentStatus.PENDING.value
-    version.error_message = None
-    document.retry_count = version.retry_count
-    document.status = DocumentStatus.PENDING.value
-    document.error_message = None
-    db.commit()
-
-    process_document_version.delay(str(version.id))
-    record_audit(
-        db,
-        auth.org_id,
-        auth.user_pk,
-        "document.retried",
-        "document",
-        document_id,
-        metadata={"retry_count": version.retry_count},
-        request=request,
+    raise HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        "Retry is not supported in this deployment. Please delete and re-upload the document.",
     )
-    return {"status": "queued"}
 
 
 @router.get("/{document_id}/download-url")

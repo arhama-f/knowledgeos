@@ -79,13 +79,27 @@ export function MarketingFooter() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t pt-6 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t pt-6 sm:flex-row">
           <p className="text-muted-foreground text-xs">
             © {new Date().getFullYear()} KnowledgeOS. All rights reserved.
           </p>
-          <p className="text-muted-foreground text-xs">
-            Built for the enterprise. Priced for growth.
-          </p>
+          <a
+            href="https://psychflo.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:text-foreground flex items-center gap-2 text-xs transition-colors"
+          >
+            A product of
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/psychflo-logo.png"
+              alt="PsychFlo"
+              width={18}
+              height={18}
+              className="inline-block opacity-50 dark:invert"
+            />
+            <span className="font-medium">PsychFlo</span>
+          </a>
         </div>
       </div>
     </footer>

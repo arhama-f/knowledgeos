@@ -21,31 +21,15 @@ export async function streamAsk(
       body: JSON.stringify({ question, session_id: sessionId }),
     });
 
-    if (!response.ok || !response.body) {
-      throw new Error(`Request failed: ${response.status}`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail ?? `Request failed: ${response.status}`);
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      const frames = buffer.split("\n\n");
-      buffer = frames.pop() ?? "";
-
-      for (const frame of frames) {
-        const line = frame.trim();
-        if (!line.startsWith("data:")) continue;
-        const payload = JSON.parse(line.slice(5).trim());
-        if (payload.type === "meta") callbacks.onMeta?.(payload);
-        else if (payload.type === "delta") callbacks.onDelta?.(payload.text);
-        else if (payload.type === "done") callbacks.onDone?.();
-      }
-    }
+    const data = await response.json();
+    callbacks.onMeta?.({ session_id: data.session_id, sources: data.sources ?? [] });
+    callbacks.onDelta?.(data.answer ?? "");
+    callbacks.onDone?.();
   } catch (error) {
     callbacks.onError?.(error instanceof Error ? error : new Error(String(error)));
   }

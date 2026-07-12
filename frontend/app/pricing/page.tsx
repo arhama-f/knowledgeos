@@ -54,7 +54,7 @@ const FAQS = [
   {
     question: "Can we change AI providers later?",
     answer:
-      "Yes. Every organization can switch between OpenAI, Anthropic, and Gemini from Settings at any time — no migration, no code changes required.",
+      "Yes. Every organization can switch AI providers from Settings at any time — no migration, no code changes required.",
   },
   {
     question: "What happens to our data?",

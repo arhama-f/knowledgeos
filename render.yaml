@@ -1,9 +1,10 @@
 services:
   - type: web
     name: knowledgeos-api
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile.prod
-    dockerContext: ./backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: free
     healthCheckPath: /health
     envVars:
@@ -11,16 +12,22 @@ services:
         value: production
       - key: LOG_LEVEL
         value: INFO
+
+      # Neon — paste your connection string from neon.tech dashboard
       - key: DATABASE_URL
-        fromDatabase:
-          name: knowledgeos-db
-          property: connectionString
+        sync: false
+
+      # Upstash — paste your Redis URL from upstash.com dashboard
       - key: REDIS_URL
-        value: redis://localhost:6379/0  # replace with Upstash URL for Celery workers
+        sync: false
+
       - key: SECRET_KEY
         generateValue: true
-      - key: CORS_ORIGINS
-        value: '["https://frontend-roan-two-76.vercel.app","https://localhost:3015"]'
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "30"
+
       - key: DEFAULT_LLM_PROVIDER
         value: anthropic
       - key: DEFAULT_LLM_MODEL
@@ -31,25 +38,34 @@ services:
         value: text-embedding-3-small
       - key: EMBEDDING_DIMENSIONS
         value: "1536"
-      - key: S3_BUCKET
-        value: documents
-      - key: S3_REGION
-        value: us-east-1
-      - key: S3_USE_SSL
-        value: "true"
-      - key: OPENAI_API_KEY
-        sync: false
+
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+
+      # Cloudflare R2 — get from R2 dashboard (Workers & Pages → R2 → Manage API tokens)
+      # Endpoint format: https://<account_id>.r2.cloudflarestorage.com
       - key: S3_ENDPOINT_URL
         sync: false
       - key: S3_ACCESS_KEY
         sync: false
       - key: S3_SECRET_KEY
         sync: false
+      - key: S3_BUCKET
+        value: documents
+      - key: S3_REGION
+        value: auto
+      - key: S3_USE_SSL
+        value: "true"
 
-databases:
-  - name: knowledgeos-db
-    plan: free
-    databaseName: knowledgeos
-    user: knowledgeos
+      - key: APP_URL
+        value: https://knowledgeos.psychflo.com
+      - key: CORS_ORIGINS
+        value: '["https://knowledgeos.psychflo.com"]'
+
+      # Resend — get API key from resend.com (free: 3,000 emails/month)
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: "KnowledgeOS <noreply@psychflo.com>"

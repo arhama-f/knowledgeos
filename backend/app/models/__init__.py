@@ -13,6 +13,7 @@ from app.models.permission import Permission
 from app.models.project import Project
 from app.models.team import Team, TeamMember
 from app.models.usage import TokenUsage, UsageRecord
+from app.models.token import InviteToken, PasswordResetToken
 from app.models.user import User
 
 __all__ = [
@@ -41,5 +42,7 @@ __all__ = [
     "TeamMember",
     "TokenUsage",
     "UsageRecord",
+    "InviteToken",
+    "PasswordResetToken",
     "User",
 ]

@@ -1,4 +1,8 @@
+import type { Metadata } from "next";
+
 import { Sidebar } from "@/components/dashboard/sidebar";
+
+export const metadata: Metadata = { title: "Dashboard" };
 import { DashboardTopBar } from "@/components/dashboard/topbar";
 import { CommandPalette } from "@/components/dashboard/command-palette";
 
