@@ -50,12 +50,10 @@ services:
         value: text-embedding-3-small
       - name: EMBEDDING_DIMENSIONS
         value: "1536"
-      - name: S3_BUCKET
+      - name: SUPABASE_URL
+        value: https://iudfdjokzomybzznqdoh.supabase.co
+      - name: SUPABASE_BUCKET
         value: documents
-      - name: S3_REGION
-        value: auto
-      - name: S3_USE_SSL
-        value: "true"
       - name: APP_URL
         value: https://knowledgeos.psychflo.com
       - name: CORS_ORIGINS
@@ -63,7 +61,7 @@ services:
       - name: RESEND_FROM_EMAIL
         value: "KnowledgeOS <noreply@psychflo.com>"
 
-      # Set these as secrets in Koyeb dashboard → Secrets, then reference them here
+      # Set these as secrets in Koyeb dashboard → Secrets
       - name: DATABASE_URL
         secret: knowledgeos-database-url
       - name: REDIS_URL
@@ -74,11 +72,7 @@ services:
         secret: knowledgeos-anthropic-key
       - name: OPENAI_API_KEY
         secret: knowledgeos-openai-key
-      - name: S3_ENDPOINT_URL
-        secret: knowledgeos-s3-endpoint
-      - name: S3_ACCESS_KEY
-        secret: knowledgeos-s3-access-key
-      - name: S3_SECRET_KEY
-        secret: knowledgeos-s3-secret-key
+      - name: SUPABASE_SERVICE_KEY
+        secret: knowledgeos-supabase-service-key
       - name: RESEND_API_KEY
         secret: knowledgeos-resend-key

@@ -25,13 +25,10 @@ class Settings(BaseSettings):
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
 
-    # Object storage (S3-compatible — MinIO locally, real S3 in prod)
-    s3_endpoint_url: str = "http://localhost:9000"
-    s3_access_key: str = "knowledgeos"
-    s3_secret_key: str = "knowledgeos-dev-secret"
-    s3_bucket: str = "documents"
-    s3_region: str = "us-east-1"
-    s3_use_ssl: bool = False
+    # Object storage (Supabase Storage)
+    supabase_url: str = "https://iudfdjokzomybzznqdoh.supabase.co"
+    supabase_service_key: str = ""
+    supabase_bucket: str = "documents"
 
     # JWT auth
     secret_key: str = "dev-secret-change-in-production"
