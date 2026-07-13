@@ -17,9 +17,12 @@ class Settings(BaseSettings):
 
     @field_validator("database_url", mode="before")
     @classmethod
-    def ensure_psycopg2_dialect(cls, v: str) -> str:
-        if isinstance(v, str) and v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+psycopg2://", 1)
+    def ensure_psycopg_dialect(cls, v: str) -> str:
+        if isinstance(v, str):
+            if v.startswith("postgresql+psycopg2://"):
+                return v.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+psycopg://", 1)
         return v
 
     # Redis / Celery

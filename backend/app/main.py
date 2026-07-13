@@ -3,7 +3,6 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_fastapi_instrumentator import Instrumentator
 
 logger = logging.getLogger("knowledgeos")
 
@@ -81,4 +80,3 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-Instrumentator().instrument(app)
